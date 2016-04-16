@@ -233,3 +233,4 @@ FakesAssemblies/
 *.exe
 *.out
 *.app
+/2016_04_16_10_56_arm_neon_introduction/android-ndk/libs

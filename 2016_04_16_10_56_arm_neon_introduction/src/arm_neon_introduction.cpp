@@ -11,7 +11,13 @@
 #include <cassert>
 #include <random>
 //project headers
+#ifdef WIN32
 #include "NEONvsSSE.h"
+#elif defined(__ARM_NEON__)
+#include "arm_neon.h"
+#else
+#error "unknown platform!"
+#endif
 #include "helper_functions.h"
 
 static void fill_random_value(std::vector<float>& vec_data)
@@ -71,14 +77,18 @@ static void neon_vector_mul(const std::vector<float>& vec_a, const std::vector<f
 static int test_neon()
 {
 	const int test_round = 1000;
-	const int data_len = 10000;
+	const int data_len = 100000;
 	std::vector<float> vec_a(data_len);
 	std::vector<float> vec_b(data_len);
 	std::vector<float> vec_result(data_len);
 	std::vector<float> vec_result2(data_len);
 	//fill random value in vecA & vecB
+	std::cout << "round of test is " << test_round << std::endl;
+	std::cout << "size of input vector is "<< data_len << std::endl;
+	std::cout << "filling random data to input vector..." << std::endl;
 	fill_random_value(vec_a);
 	fill_random_value(vec_b);
+	std::cout << "fill random data to input vector done.\n" << std::endl;
 	//check the result is same
 	{
 		normal_vector_mul(vec_a, vec_b, vec_result);
