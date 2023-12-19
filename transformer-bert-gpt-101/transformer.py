@@ -222,39 +222,61 @@ class MyDataSet(Dataset):
 
         return x, y_inp, y_out, x_key_padding_mask, y_key_padding_mask, y_self_atten_mask, y_mem_key_padding_mask
 
-# model configs
-d_model = 256
-d_fc = d_model * 4
-n_heads = 8
-n_encoder_layers = 6
-n_decoder_layers = 6
-max_length = 6
-x_vocab = 100
-y_vocab = max_length
+if __name__ == '__main__':
+    # model configs
+    d_model = 256
+    d_fc = d_model * 4
+    n_heads = 8
+    n_encoder_layers = 6
+    n_decoder_layers = 6
+    max_length = 6
+    x_vocab = 100
+    y_vocab = max_length
 
-# data configs
-PAD_ID = 0
-BOS_ID = 1
-EOS_ID = 2
+    # data configs
+    PAD_ID = 0
+    BOS_ID = 1
+    EOS_ID = 2
 
-num_data = 100000
-batch_size = 320
-dataset = MyDataSet(num_data, x_vocab, max_length, PAD_ID, BOS_ID, EOS_ID)
-data_loader = DataLoader(dataset, batch_size = batch_size, shuffle=True, num_workers=0)
+    num_data = 100000
+    batch_size = 320
+    dataset = MyDataSet(num_data, x_vocab, max_length, PAD_ID, BOS_ID, EOS_ID)
+    data_loader = DataLoader(dataset, batch_size = batch_size, shuffle=True, num_workers=0)
 
-# train configs
-device = 'cuda' if torch.cuda.is_available() else 'cpu'
-epochs = 5
-model = MyModel(max_length + 1, x_vocab + 3, y_vocab + 3, d_model, d_fc, n_heads, n_encoder_layers, n_decoder_layers)
-model = model.to(device)
-criterion = nn.CrossEntropyLoss(ignore_index=PAD_ID)
-optimizer = optim.AdamW(model.parameters(), lr=0.0001)
-lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs, eta_min=1e-7)
+    # train configs
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    epochs = 5
+    model = MyModel(max_length + 1, x_vocab + 3, y_vocab + 3, d_model, d_fc, n_heads, n_encoder_layers, n_decoder_layers)
+    model = model.to(device)
+    criterion = nn.CrossEntropyLoss(ignore_index=PAD_ID)
+    optimizer = optim.AdamW(model.parameters(), lr=0.0001)
+    lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs, eta_min=1e-7)
 
-# train
-model.train()
-for epoch in range(epochs):
-    for batch, (x, y_inp, y_out, x_key_padding_mask, y_key_padding_mask, y_self_atten_mask, y_mem_key_padding_mask) in enumerate(data_loader):
+    # train
+    model.train()
+    for epoch in range(epochs):
+        for batch, (x, y_inp, y_out, x_key_padding_mask, y_key_padding_mask, y_self_atten_mask, y_mem_key_padding_mask) in enumerate(data_loader):
+            x = x.to(device)
+            y_inp = y_inp.to(device)
+            y_out = y_out.to(device)
+            x_key_padding_mask = x_key_padding_mask.to(device)
+            y_key_padding_mask = y_key_padding_mask.to(device)
+            y_self_atten_mask = y_self_atten_mask.to(device)[0]
+            y_mem_key_padding_mask = y_mem_key_padding_mask.to(device)
+            yp = model(x, y_inp, x_key_padding_mask, y_key_padding_mask, y_self_atten_mask, y_mem_key_padding_mask)
+
+            loss = criterion(yp.view(-1, y_vocab + 3), y_out.view(-1))
+            print(f'epoch: {(epoch + 1)}, batch: {(batch + 1)}, lr: {lr_scheduler.get_last_lr()[0]:.7f}, loss: {loss:.6f}')
+
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+        lr_scheduler.step()
+
+    # val
+    model.eval()
+    with torch.no_grad():
+        (x, y_inp, y_out, x_key_padding_mask, y_key_padding_mask, y_self_atten_mask, y_mem_key_padding_mask) = next(iter(data_loader))
         x = x.to(device)
         y_inp = y_inp.to(device)
         y_out = y_out.to(device)
@@ -263,31 +285,11 @@ for epoch in range(epochs):
         y_self_atten_mask = y_self_atten_mask.to(device)[0]
         y_mem_key_padding_mask = y_mem_key_padding_mask.to(device)
         yp = model(x, y_inp, x_key_padding_mask, y_key_padding_mask, y_self_atten_mask, y_mem_key_padding_mask)
-
-        loss = criterion(yp.view(-1, y_vocab + 3), y_out.view(-1))
-        print(f'epoch: {(epoch + 1)}, batch: {(batch + 1)}, lr: {lr_scheduler.get_last_lr()[0]:.7f}, loss: {loss:.6f}')
-
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
-    lr_scheduler.step()
-
-# val
-model.eval()
-with torch.no_grad():
-    (x, y_inp, y_out, x_key_padding_mask, y_key_padding_mask, y_self_atten_mask, y_mem_key_padding_mask) = next(iter(data_loader))
-    x = x.to(device)
-    y_inp = y_inp.to(device)
-    y_out = y_out.to(device)
-    x_key_padding_mask = x_key_padding_mask.to(device)
-    y_key_padding_mask = y_key_padding_mask.to(device)
-    y_self_atten_mask = y_self_atten_mask.to(device)[0]
-    y_mem_key_padding_mask = y_mem_key_padding_mask.to(device)
-    yp = model(x, y_inp, x_key_padding_mask, y_key_padding_mask, y_self_atten_mask, y_mem_key_padding_mask)
-    yp = F.softmax(yp, dim = -1)
-    ypg = torch.argmax(yp, dim = -1)
-    print(f'x: {x[0]}')
-    print(f'y_inp: {y_inp[0]}')
-    print(f'y_out: {y_out[0]}')
-    # print(f'yp: {yp[0]}')
-    print(f'ypg: {ypg[0]}')
+        yp = F.softmax(yp, dim = -1)
+        ypg = torch.argmax(yp, dim = -1)
+        ypg[y_out == PAD_ID] = PAD_ID
+        
+        print(f'x: {x[0]}')
+        print(f'y_inp: {y_inp[0]}')
+        print(f'y_out: {y_out[0]}')
+        print(f'ypg: {ypg[0]}')
