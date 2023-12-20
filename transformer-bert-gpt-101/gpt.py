@@ -175,7 +175,6 @@ if __name__ == '__main__':
         p_seq[out_seq == PAD_ID] = PAD_ID
         
         # ignore first token
-        p_seq[:][0] = PAD_ID
 
         print(f'inp_seq: {inp_seq[0]}')
         print(f'out_seq: {out_seq[0]}')
