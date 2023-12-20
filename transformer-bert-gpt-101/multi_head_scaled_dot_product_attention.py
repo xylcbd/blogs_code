@@ -33,7 +33,8 @@ def multi_head_scaled_dot_product_attention(q, k, v, n_heads, q_weight, q_bias, 
 
     if key_padding_mask is not None:
         assert key_padding_mask.shape[0] == b and key_padding_mask.shape[1] == l_kv
-        key_padding_mask = key_padding_mask.view(b, 1, 1, l_kv).expand(-1, n_heads, -1, -1).reshape(b * n_heads, 1, l_kv)
+        atten_mask = atten_mask.view(b, 1, l_kv, l_kv).expand(-1, n_heads, -1, -1).reshape(b * n_heads, l_kv, l_kv)
+        key_padding_mask = key_padding_mask.view(b, 1, l_kv).expand(-1, n_heads, -1).reshape(b * n_heads, 1, l_kv)
         if atten_mask is None:
             atten_mask = key_padding_mask
         else:
